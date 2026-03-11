@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Restore Search Engines</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 640px;
+        margin: 40px auto;
+        padding: 0 20px;
+        color: #202020;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 6px;
+      }
+      .subtitle {
+        color: #666;
+        margin-bottom: 24px;
+        font-size: 14px;
+      }
+      .engine-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border: 1px solid #e0e0e6;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        background: white;
+      }
+      .engine-info {
+        flex: 1;
+      }
+      .engine-name {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .engine-url {
+        font-size: 11px;
+        color: #888;
+        font-family: monospace;
+        margin-top: 2px;
+        word-break: break-all;
+      }
+      .add-btn {
+        background: #0060df;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 6px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .add-btn:disabled {
+        background: #aaa;
+        cursor: default;
+      }
+      .added-badge {
+        color: green;
+        font-size: 12px;
+      }
+      .no-url {
+        font-size: 12px;
+        color: #c00;
+      }
+      .meta {
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 Restore Search Engines</h1>
+    <p class="subtitle">
+      Click "Add to Firefox" for each engine you want to restore.
+    </p>
+    <div id="meta" class="meta"></div>
+    <div id="engine-list"></div>
+    <script src="restore.js"></script>
+  </body>
+</html>

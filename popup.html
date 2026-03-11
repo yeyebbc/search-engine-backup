@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Search Engine Backup</title>
+  </head>
+  <body>
+    <header>
+      <h1>🔍 Search Backup</h1>
+      <div id="status-bar" class="status disconnected">
+        <span id="status-text">Not connected</span>
+        <button id="auth-btn">Connect Dropbox</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="actions" class="hidden">
+        <button id="backup-btn" class="primary">⬆ Backup to Dropbox</button>
+        <button id="restore-btn" class="secondary">
+          ⬇ Restore from Dropbox
+        </button>
+      </section>
+
+      <section id="engines-section">
+        <h2>
+          Installed Search Engines
+          <button id="refresh-btn" title="Refresh list">↻</button>
+        </h2>
+        <p class="hint">
+          Firefox doesn't expose search URLs via API. Enter each custom engine's
+          URL template below so it's included in the backup.
+        </p>
+        <div id="engine-list"></div>
+      </section>
+
+      <div id="message-box" class="hidden"></div>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
