@@ -1,0 +1,24 @@
+{
+    "msgSelectMozlz4": {
+        "message": "Please select 'search.json.mozlz4' from your Firefox profile to extract URLs."
+    },
+    "msgParsingFile": {
+        "message": "Extracting search engines from mozlz4…"
+    },
+    "msgParsedSuccess": {
+        "message": "Extracted $COUNT$ URLs. Proceeding to Dropbox backup…",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "msgFileParseError": {
+        "message": "Could not parse mozlz4 file: $ERROR$",
+        "placeholders": {
+            "error": {
+                "content": "$1"
+            }
+        }
+    }
+}

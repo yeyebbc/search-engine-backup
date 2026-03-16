@@ -3,6 +3,7 @@
     "name": "Search Engine Backup",
     "version": "1.0.0",
     "description": "Backup and restore Firefox custom search engine settings via Dropbox",
+    "default_locale": "en",
     "permissions": [
         "search",
         "storage",
@@ -28,6 +29,8 @@
     },
     "web_accessible_resources": [
         "restore.html",
-        "restore.js"
+        "restore.js",
+        "backup.html",
+        "backup.js"
     ]
 }

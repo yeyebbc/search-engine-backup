@@ -6,5 +6,6 @@ Codes are vibed.
 
 # TO-DO
 
+- Easier restore method
 - Externalise strings
 - Add other cloud storage providers

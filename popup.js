@@ -4,20 +4,96 @@ const BACKUP_PATH = "/firefox_search_backup.json";
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
+  applyI18n();
+
   await checkAuthState();
   await loadEngines();
 
   document
     .getElementById("auth-btn")
     .addEventListener("click", handleAuthClick);
-  document.getElementById("backup-btn").addEventListener("click", doBackup);
+  // Backup button listener
+  document.getElementById("backup-btn").addEventListener("click", () => {
+    browser.tabs.create({ url: browser.runtime.getURL("backup.html") });
+  });
+  // Listen for file selection
+  document
+    .getElementById("mozlz4-input")
+    .addEventListener("change", handleMozlz4Selection);
   document.getElementById("restore-btn").addEventListener("click", doRestore);
   document.getElementById("refresh-btn").addEventListener("click", loadEngines);
 });
 
+// ─── MozLz4 File Handling ──────────────────────────────────────────────────
+async function handleMozlz4Selection(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  showMessage(t("msgParsingFile"), "info");
+  try {
+    const text = await parseMozLz4(file);
+    const json = JSON.parse(text);
+
+    const { engine_urls = {} } = await browser.storage.local.get("engine_urls");
+    let foundCount = 0;
+
+    // Extract OpenSearch templates and query parameters from JSON
+    if (json.engines) {
+      for (const eng of json.engines) {
+        const url = extractTemplateUrl(eng);
+        if (url && eng._name) {
+          engine_urls[eng._name] = url;
+          foundCount++;
+        }
+      }
+
+      // Save extracted URLs to local storage and update the UI inputs
+      await browser.storage.local.set({ engine_urls });
+      await loadEngines();
+    }
+
+    showMessage(t("msgParsedSuccess", String(foundCount)), "success");
+
+    // Resume the normal backup to Dropbox
+    await doBackup();
+  } catch (err) {
+    showMessage(t("msgFileParseError", err.message), "error");
+  }
+
+  e.target.value = ""; // Reset file input
+}
+
+function extractTemplateUrl(engineData) {
+  if (!engineData._urls || !engineData._urls.length) return null;
+
+  // Prefer HTML search URLs over suggestions/JSON APIs
+  const urlObj =
+    engineData._urls.find((u) => u.type === "text/html") || engineData._urls[0];
+  if (!urlObj.template) return null;
+
+  let url = urlObj.template;
+
+  // Append query params (e.g., ?q={searchTerms})
+  if (urlObj.params && urlObj.params.length > 0) {
+    const query = urlObj.params
+      .filter((p) => p.name && p.value !== undefined)
+      .map(
+        (p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value)}`,
+      )
+      .join("&");
+
+    if (query) {
+      url += (url.includes("?") ? "&" : "?") + query;
+    }
+  }
+
+  // encodeURIComponent turns {searchTerms} into %7BsearchTerms%7D. Revert all {placeholders}.
+  return url.replace(/%7B(.*?)%7D/g, "{$1}");
+}
+
 async function checkAuthState() {
   const { dropbox_access_token } = await browser.storage.local.get(
-    "dropbox_access_token"
+    "dropbox_access_token",
   );
   setAuthUI(!!dropbox_access_token);
 }
@@ -38,7 +114,7 @@ function setAuthUI(connected) {
 
 async function handleAuthClick() {
   const { dropbox_access_token } = await browser.storage.local.get(
-    "dropbox_access_token"
+    "dropbox_access_token",
   );
 
   if (dropbox_access_token) {
@@ -86,7 +162,7 @@ async function loadEngines() {
         ${
           engine.alias
             ? `<span style="color:#888;font-size:11px">${escHtml(
-                engine.alias
+                engine.alias,
               )}</span>`
             : ""
         }
@@ -138,7 +214,7 @@ async function doBackup() {
       `✓ Backup saved to Dropbox (${
         payload.engines.length
       } engines, ${new Date().toLocaleTimeString()})`,
-      "success"
+      "success",
     );
   } catch (err) {
     showMessage(`Backup failed: ${err.message}`, "error");
@@ -169,9 +245,9 @@ async function doRestore() {
       `Restore page opened — add ${
         payload.engines.length
       } engines from backup dated ${new Date(
-        payload.backupDate
+        payload.backupDate,
       ).toLocaleString()}.`,
-      "success"
+      "success",
     );
   } catch (err) {
     showMessage(`Restore failed: ${err.message}`, "error");
@@ -264,4 +340,100 @@ function escHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// ─── Pure JS MozLz4 Decompressor ───────────────────────────────────────────
+async function parseMozLz4(file) {
+  const buf = await file.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  const textDecoder = new TextDecoder();
+
+  // 1. Verify 8-byte magic header
+  const magic = textDecoder.decode(u8.subarray(0, 8));
+  if (magic !== "mozLz40\0")
+    throw new Error("Invalid signature (not a Firefox mozlz4 file)");
+
+  // 2. Read 4-byte little-endian uncompressed size
+  const uncompressedSize = new DataView(buf).getUint32(8, true);
+
+  // 3. Decompress the LZ4 block payload
+  const compressed = u8.subarray(12);
+  const decompressed = decompressLz4Block(compressed, uncompressedSize);
+
+  return textDecoder.decode(decompressed);
+}
+
+function decompressLz4Block(input, uncompressedSize) {
+  const output = new Uint8Array(uncompressedSize);
+  let i = 0,
+    o = 0;
+
+  while (i < input.length) {
+    const token = input[i++];
+    let litLen = token >> 4;
+
+    // Calculate literal length
+    if (litLen === 15) {
+      let l;
+      do {
+        l = input[i++];
+        litLen += l;
+      } while (l === 255);
+    }
+
+    if (i + litLen > input.length || o + litLen > output.length) {
+      throw new Error("LZ4 literal copy out of bounds");
+    }
+
+    // Copy literals
+    for (let j = 0; j < litLen; j++) output[o++] = input[i++];
+
+    if (i >= input.length) break; // Normal end of block
+
+    // Read 2-byte little-endian match offset
+    if (i + 2 > input.length) throw new Error("LZ4 missing offset");
+    const offset = input[i++] | (input[i++] << 8);
+    if (offset === 0) throw new Error("Invalid LZ4 match offset");
+
+    // Calculate match length
+    let matchLen = token & 0x0f;
+    if (matchLen === 15) {
+      let l;
+      do {
+        l = input[i++];
+        matchLen += l;
+      } while (l === 255);
+    }
+    matchLen += 4; // Minimum match length is 4 in LZ4
+
+    if (o + matchLen > output.length)
+      throw new Error("LZ4 match copy out of bounds");
+
+    const matchPos = o - offset;
+    if (matchPos < 0) throw new Error("LZ4 match position negative");
+
+    // Copy match (byte-by-byte to support overlapping sequences)
+    for (let j = 0; j < matchLen; j++) {
+      output[o] = output[matchPos + j];
+      o++;
+    }
+  }
+  return output;
+}
+
+// ─── i18n Helper ────────────────────────────────────────────────────────────
+
+function t(key, ...subs) {
+  // Fetches the translated string from _locales/en/messages.json
+  return browser.i18n.getMessage(key, subs) || key;
+}
+
+function applyI18n() {
+  // Replaces all elements with data-i18n attributes with their translations
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
 }
